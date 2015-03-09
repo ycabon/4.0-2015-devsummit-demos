@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>4.0</title>
+
+    <link href="../../commons/css/style.css" rel="stylesheet" type="text/css">
+    <script src="../../commons/dojo-config.js"></script>
+    <link href="//jsdev.arcgis.com/4.0beta1/esri/css/jsapi.css" rel="stylesheet" type="text/css">
+    <script src="//jsdev.arcgis.com/4.0beta1/"></script>
+    <style>
+#layersWidgetDivWrapper {
+  background: #1F78B4;
+  position: absolute;
+  bottom: 40px;
+  left: 40px;
+  z-index: 100;
+  padding: 0;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+}
+#layersWidgetDiv {
+  width: 200px;
+}
+.controlBtn {
+  -webkit-border-radius: 8;
+  -moz-border-radius: 8;
+  border-radius: 8px;
+  font-family: Arial;
+  color: #FFF;
+  font-size: 40pt;
+  background: #1F78B4;
+  width: 82px;
+  height: 82px;
+  border: none;
+  text-decoration: none;
+}
+.controlBtn:hover {
+  background: #399BDD;
+}
+</style>
+    <script type="text/javascript">
+
+
+var map, ft, fl1, fl2, fl3, flw1, flw2, flw3, gl, dw, rt, rp, mdownTime, ss, g, ground, 
+srv = "//genesis.esri.com/arcgis/rest/services/Hosted/";
+
+require([
+  "esri/config",
+  "esri/urlUtils", 
+  "esri/Map", 
+  "esri/Camera",
+  "esri/graphic",
+
+  "esri/geometry/Point", 
+  "esri/geometry/Polyline", 
+
+  "esri/layers/FeatureLayer", 
+  "esri/layers/GraphicsLayer", 
+  "esri/layers/SceneServiceLayer",
+
+  "esri/symbols/PointSymbol3D", 
+  "esri/symbols/LineSymbol3D", 
+  
+  "esri/dijit/Directions", 
+  
+  "esri/tasks/RouteTask", 
+  "esri/tasks/RouteParameters", 
+  "esri/tasks/FeatureSet", 
+
+  "dojo/aspect",
+
+  "local/pilot",
+  
+  "dojo/_base/lang", 
+  "dojo/mouse", 
+  "dojo/on", 
+  "dojo/domReady!"
+], function(
+esriConfig, urlUtils, Map, Camera, Graphic, 
+Point, Polyline, 
+FeatureLayer, GraphicsLayer, SceneLayer, 
+PointSymbol3D, LineSymbol3D,
+Directions, 
+RouteTask, RouteParams, FeatureSet, 
+aspect, pilot,
+lang, mouse, on
+) {
+  esriConfig.defaults.io.corsEnabledServers.push("genesis.esri.com");
+  esriConfig.defaults.io.useWorkers = false;
+
+  var camera = new Camera({
+    position: {
+      x: -13046249.031173145,
+      y: 4036161.592830927,
+      z: 469.0804203758016,
+      spatialReference: {"wkid": 102100}
+    },heading: 25.738375098453716,tilt: 71.8051312021184
+  });
+  
+  map = new Map({
+    container: "mapDiv",
+    viewType: "3d",
+    basemap: "topo"
+  });
+
+  /***************************************
+   *          RESULT LAYER
+   **************************************/
+  
+  gl = new GraphicsLayer();
+  gl.set("hasZ", true);
+  map.add(gl);
+
+  /***************************************
+   *          FLOORS LAYERS
+   **************************************/
+  
+  ground = 396;
+  ft = 3.2808399;
+
+  fl1 = new FeatureLayer({
+    url: srv + "QFloors102100_1/FeatureServer/0", 
+    mode: FeatureLayer.MODE_SNAPSHOT,
+    elevationInfo: {mode: "absoluteHeight",offset: ground + 0.1}
+  });
+  fl2 = new FeatureLayer({
+    url: srv + "QFloors102100_2/FeatureServer/0", 
+    mode: FeatureLayer.MODE_SNAPSHOT,
+    elevationInfo: {mode: "absoluteHeight",offset: ground + 16.97}
+  });
+  fl3 = new FeatureLayer({
+    url : srv + "QFloors102100_3/FeatureServer/0", 
+    mode: FeatureLayer.MODE_SNAPSHOT,
+    elevationInfo: {mode: "absoluteHeight",offset: ground + 32}
+  });
+  map.add([fl1, fl2, fl3]);
+
+  /***************************************
+   *          WALLS LAYERS
+   **************************************/
+
+  flw1 = new SceneLayer({
+    url: srv + "Q_Floors102100_1_lines_extruded/SceneServer/layers/0", 
+    opacity: 0.75, visible: false
+  });
+  flw2 = new SceneLayer({
+    url: srv + "Q_Floors102100_2_lines_extruded/SceneServer/layers/0", 
+    opacity: 0.75,
+    visible: false
+  });
+  flw3 = new SceneLayer({
+    url: srv + "Q_Floors102100_3_lines_extruded/SceneServer/layers/0", 
+    opacity: 0.75,
+    visible: false
+  });
+  map.add([flw1, flw2, flw3]);
+
+  /***************************************
+   *           ROUTE TASKS
+   **************************************/
+
+  rt = new RouteTask("http://3dcampus.arcgis.com/arcgis/rest/services/Routing/BuildingQ/NAServer/Route");
+  rp = new RouteParams();
+  rp.stops = new FeatureSet();
+  rp.returnRoutes = true;
+  rp.returnDirections = false;
+  rp.outputGeometryPrecision = 2;
+  rp.outputGeometryPrecisionUnits = "esriMeters";
+  aspect.after(rp, "toJson", function(json) {
+    json.returnZ = true;
+    return json;
+  });
+  
+  map.then(function() {
+    map.basemap.baseLayers.getItemAt(0).set('opacity', 0.8);
+    map.view.set("camera", camera);
+    terrainCheck(true);
+
+    //digitizing new stops listener
+    map.view.on('tap', function(evt) {
+      if (evt.graphic) {
+        //adding stop
+        evt.mapPoint.z += 1.125;
+        var gr = new Graphic({
+          geometry: evt.mapPoint,
+          symbol: new PointSymbol3D.fromJson({
+            symbolLayers: [{
+                type: "Object",
+                material: {
+                  color: [0, 255, 0]
+                },
+                width: 1.25,
+                resource: {
+                  primitive: "diamond"
+                }
+              }]
+          })
+        });
+        gl.add(gr);
+        var rs = lang.clone(gr);
+        rs.geometry.set('z', (rs.geometry.z - ground) / ft);
+        rp.stops.features.push(rs);
+        if (rp.stops.features.length > 1) {
+          rt.solve(rp).then(function(rr) {
+            g = rr.routeResults[0].route.geometry;
+            g.hasZ = true;
+            for (var i = 0; i < g.paths.length; i++) {
+              for (var j = 0; j < g.paths[i].length; j++) {
+                g.paths[i][j][0] -= 0.8;
+                g.paths[i][j][1] -= 1.2;
+                g.paths[i][j][2] = g.paths[i][j][2] * ft + ground + 0.2;
+              }
+            }
+            pilot.setFlightPath(g.paths[0]);
+            gl.add(new Graphic({
+              geometry: new Polyline.fromJson(g),
+              symbol: new LineSymbol3D.fromJson({
+                symbolLayers: [{
+                  type: "Path",
+                  size: 0.5, //meters
+                  profile: "tube",
+                  material: {
+                    color: [100, 100, 255]
+                  }
+                }]
+              })
+            }));
+            document.querySelector("#layersWidgetDivWrapper").style.opacity = 1;
+            toggleWalls();
+          }, function(err) {
+            console.log(err);
+          });
+        }
+      }
+    });
+  }); // end map.then
+
+  var observer = function(changes) {
+    var change = changes.some(function(change) {
+      return change.name === "_pendingUpdates";
+    });
+    if (change) {
+      map.view.set("camera", camera);
+    }
+  };
+    
+  window.terrainCheck = function(enabled) {
+    if (!window.tcProc) {
+      window.tcProc = map.view.navigation.getCameraIntersectTerrain;
+    }
+    if (enabled) {
+      Object.observe(map.view.basemapTerrain, observer);
+      require(["esri/viewports/viewport3d/canvas3d/webgl-engine/lib/Camera"], function(Camera) {
+        map.view.navigation.getCameraIntersectTerrain = function(eye, center, up) {
+          return new Camera(eye, center, up);
+        }
+      });
+    } else {
+      Object.unobserve(map.view.basemapTerrain, observer);
+      map.view.navigation.getCameraIntersectTerrain = window.tcProc;
+    }
+  };
+
+  window.toggleWalls = function() {
+    if (!flw1.visible) {
+      flw1.set("visible", true);
+      flw2.set("visible", true);
+      flw3.set("visible", true);
+    } else {
+      flw1.set("visible", false);
+      flw2.set("visible", false);
+      flw3.set("visible", false);
+    }
+  };
+
+  window.reset = function() {
+    rp.stops.features = [];
+    gl.clear();
+  };
+
+  window.animate = function() {
+    //Animate!
+    if (g) {
+      terrainCheck(false);
+      if (window.flyTimer) {
+        cancelAnimationFrame(flyTimer);
+        flyTimer = null;
+        document.querySelector(".controlBtn").innerHTML = "&#9654;";
+      } else {
+        var move = function() {
+          var t = window.performance.now() - window.t0;
+          if (t <= pilot.tLen) {
+            var c = map.view.get("camera");
+            pilot.fly(t, c);
+            map.view.set("camera", c);
+          } else {
+            animate();
+          }
+          window.flyTimer = requestAnimationFrame(move);
+        };
+        window.t0 = window.performance.now();
+        window.flyTimer = requestAnimationFrame(move);
+        document.querySelector(".controlBtn").innerHTML = "&#9724;";
+      }
+    }
+  };
+
+  on(document.querySelector(".controlBtn"), "click", window.animate);
+});
+</script>
+  </head>
+
+<!-- possible values: light & dark -->
+  <body class="dark">
+    <div class="application">
+      <div id="mapDiv" class="esriMap">
+        <div id="layersWidgetDivWrapper" class="shadowed">
+          <button class="controlBtn">&#9654;</button>
+        </div>
+      </div>
+      <div class="applicationUI">
+<!--        <div class="drawer">
+       </div> -->
+
+<!-- possible values: applicationBar + (none, green, orange) -->
+        <div class="applicationBar">
+          <div class="content">
+            <div class="cartouche">
+              <span class="label">4.0</span>
+            </div>
+            <div class="main">
+              <span class="title">Indoor routing</span>
+            </div>
+            <div class="actionBar">
+<!-- top right content, have some style issues -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+  
+</html>

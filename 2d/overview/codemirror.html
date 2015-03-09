@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>4.0</title>
+    <link rel="stylesheet" href="libs/codemirror/codemirror.css">
+    <script src="libs/codemirror/codemirror.js"></script>
+    <script src="libs/codemirror/mode/javascript/javascript.js"></script>
+     
+    <link href="//jsdev.arcgis.com/4.0beta1/esri/css/jsapi.css" rel="stylesheet" type="text/css">
+    <script src="//jsdev.arcgis.com/4.0beta1/"></script>
+	
+	<style>
+	  html, body, #mapDiv {
+	    margin: 0;
+		padding: 0;
+		height: 100%;
+	  }
+	  
+	  .code {
+	    font-size: 14pt;
+	    position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 10;		
+	  }
+	</style>
+    
+    <script type="text/javascript">
+
+      var map;
+      
+      require([
+        "esri/Map",
+        "dojo/domReady!"
+      ], function(
+        Map
+      ) {
+        
+        //----------------------------------
+        //  Setup the map
+        //----------------------------------
+        
+        map = new Map({
+		  container: 'mapDiv',
+		  viewType: '2d',
+          basemap: 'satellite'
+        });
+		
+		CodeMirror.fromTextArea(document.getElementById("code"), {
+	      lineNumbers: true,
+          mode: "javascript"
+        });
+		
+      });
+    </script>
+  </head>
+  
+<!-- possible values: light & dark -->
+  <body class="light">
+      <div id="mapDiv" class="esriMap">
+        <div class="code">
+          <textarea id="code">
+//----------------------------------
+//  Setup the map
+//----------------------------------
+
+var map = new Map({
+  basemap: 'satellite',
+  container: 'mapDiv',
+  viewType: '2d'
+});
+
+           </textarea>
+         </div>
+      </div>
+  </body>
+  
+</html>

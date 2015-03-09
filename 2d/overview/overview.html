@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Overview globe</title>
+    
+    <link href="//jsdev.arcgis.com/4.0beta1/esri/css/esri.css" rel="stylesheet" type="text/css">
+ 
+    <style>
+      html, body, #mapDiv {
+        margin:0;
+        padding:0;
+        width: 100%;
+        height: 100%;
+      }
+      #mapDiv {
+        background: url(images/noisy_grid.png);
+      }
+      #overviewDiv canvas {
+        pointer-events: none;
+        -webkit-clip-path: circle(118px at 50% 50%);                                                   
+      }
+      #basemapToggleDiv {
+        top: 20px;
+        right: 20px;
+        position: absolute;
+      }
+	  </style>
+
+    <script src="//jsdev.arcgis.com/4.0beta1/"></script>
+    <script type="text/javascript">
+      
+      var map,
+          overview,
+          gl;
+
+      
+      require([
+        "esri/Map",
+        "esri/SpatialReference",
+        "esri/Camera",
+        "esri/Collection",
+        "esri/graphic",
+        "esri/Color",
+
+        "esri/geometry/Extent",
+        "esri/geometry/Polygon",
+        "esri/geometry/Point",
+
+        "esri/symbols/SimpleFillSymbol",
+        "esri/symbols/SimpleLineSymbol",
+
+        "esri/layers/GraphicsLayer",
+
+        "esri/views/View3D",
+
+        "esri/dijit/BasemapToggle",
+        
+        "dojo/domReady!",
+      ], function(
+        Map, SpatialReference, Camera, Collection, Graphic, Color,
+        Extent, Polygon, Point,
+        SimpleFillSymbol, SimpleLineSymbol,
+        GraphicsLayer,
+        View3D,
+        BasemapToggle
+      ) {
+        
+        map = new Map({
+          container: "mapDiv",
+          viewType: "2d",
+          basemap: "national-geographic",
+          extent: new Extent({
+            xmin: -14900328,
+            ymin: 2882295,
+            xmax: -7386262,
+            ymax: 6658896,
+            spatialReference: new SpatialReference(102100)
+          })
+        });
+        
+        map.add(gl = new GraphicsLayer({
+          hasZ: false
+        }));
+        
+        overview = View3D({
+          container: "overviewDiv",
+          map: map
+        });
+
+        var camera = new Camera(
+          new Point(-11143293, 4770595, 15770874.316803519, new SpatialReference(102100)), // position
+          0, // heading
+          0 // tilt
+        );
+
+        var updateExtentGraphic = function() {
+          gl.clear();
+          gl.add(new Graphic({
+            geometry: Polygon.fromExtent(map.view.get("extent")),
+            symbol: new SimpleFillSymbol({
+              outline: new SimpleLineSymbol({
+                color: "white",
+                width: 5
+              }),
+              style: "none"
+            })
+          }));
+
+          gl.add(new Graphic({
+            geometry: Polygon.fromExtent(map.view.get("extent")),
+            symbol: new SimpleFillSymbol({
+              outline: new SimpleLineSymbol({
+                color: "#E7298A",
+                width: 3
+              }),
+              color: "rgba(231,41,138,0.1)"
+            })
+          }));
+        }
+
+        map.then(function() {
+          map.view.layerViewsFlat.on("change", function(e) {
+            e.added.forEach(function(lv) {
+              if (lv.layer === gl) {
+                lv.set("visible", false);
+              }
+            })
+          });
+          map.view.on("view-change", function() {
+            camera.position.x = map.view.state.x;
+            camera.position.y = map.view.state.y;
+            overview.set("camera", camera);
+            updateExtentGraphic();
+          });
+          map.view.set("animating", true);
+          updateExtentGraphic();
+        });
+
+        map.then(function() {
+          overview.set("camera", camera);
+        });
+
+        var toggle = new BasemapToggle({
+          map: map,
+          basemap: "satellite"
+        }, "basemapToggleDiv");
+        toggle.startup();
+
+      });
+      
+    </script>
+  </head>
+
+  <body>
+    <div id="mapDiv">
+    </div>
+
+    <div id="basemapToggleDiv"></div>
+
+    <div id="overviewContainer" style="position: absolute; width: 300px; height: 300px; bottom: 10px; left: 10px;">
+       <svg width="300" height="300" style="position: absolute;">
+        <defs>
+          <radialGradient id="drop_shadow" cx="50%" cy="50%">
+            <stop offset="20%" stop-color="#000" stop-opacity=".5"></stop>
+            <stop offset="100%" stop-color="#000" stop-opacity="0"></stop>
+          </radialGradient>
+        </defs>
+        <ellipse cx="150" cy="260" rx="75" ry="20" style="fill: url(#drop_shadow);"></ellipse>
+      </svg>
+      <div id="overviewDiv" style="position: absolute; width: 300px; height: 300px; bottom 0;"></div>
+      <svg width="300" height="300" style="position: absolute;">
+        <defs>
+          <radialGradient id="globe_highlight" cx="75%" cy="25%">
+            <stop offset="5%" stop-color="#fff" stop-opacity="0.4"></stop>
+            <stop offset="100%" stop-color="#000" stop-opacity="0.1"></stop>
+          </radialGradient>
+          <radialGradient id="globe_shading" cx="55%" cy="45%">
+            <stop offset="30%" stop-color="#fff" stop-opacity="0"></stop>
+            <stop offset="100%" stop-color="#fff" stop-opacity="0.3"></stop>
+          </radialGradient>
+        </defs>
+        <circle cx="150" cy="150" r="118" style="fill: url(#globe_highlight);"></circle>
+      </svg>
+    </div>
+  </body>
+  
+</html>
