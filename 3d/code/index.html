@@ -125,9 +125,11 @@ url = '//www.arcgis.com/...';
 interiorLayer = new SceneLayer(url);
 
   // group layers together
-sdccGroupLayer = new GroupLayer();
-sdccGroupLayer.add(exteriorlayer);
+sdccGroupLayer = new GroupLayer({
+  visibilityMode: 'exclusive'
+});
 sdccGroupLayer.add(interiorLayer);
+sdccGroupLayer.add(exteriorlayer);
 
 scene.add(sdccGroupLayer);
 
