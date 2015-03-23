@@ -1,3 +1,5 @@
+**demos are using a dev build of 4.0 - might break**
+
 # 4.0-2015-devsummit-demos
 collection of demos for Esri Devsummit 2015
 - [Overview globe](http://ycabon.github.io/4.0-2015-devsummit-demos/2d/overview/overview.html)
