@@ -3,9 +3,9 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Overview globe</title>
-    
-    <link href="//jsdev.arcgis.com/4.0beta1/esri/css/esri.css" rel="stylesheet" type="text/css">
- 
+
+    <link href="//js.arcgis.com/4.0beta1/esri/css/esri.css" rel="stylesheet" type="text/css">
+
     <style>
       html, body, #mapDiv {
         margin:0;
@@ -18,7 +18,7 @@
       }
       #overviewDiv canvas {
         pointer-events: none;
-        -webkit-clip-path: circle(118px at 50% 50%);                                                   
+        -webkit-clip-path: circle(118px at 50% 50%);
       }
       #basemapToggleDiv {
         top: 20px;
@@ -27,20 +27,20 @@
       }
 	  </style>
 
-    <script src="//jsdev.arcgis.com/4.0beta1/"></script>
+    <script src="//js.arcgis.com/4.0beta1/"></script>
     <script type="text/javascript">
-      
+
       var map,
           overview,
           gl;
 
-      
+
       require([
         "esri/Map",
-        "esri/SpatialReference",
+        "esri/geometry/SpatialReference",
         "esri/Camera",
-        "esri/Collection",
-        "esri/graphic",
+        "esri/core/Collection",
+        "esri/Graphic",
         "esri/Color",
 
         "esri/geometry/Extent",
@@ -52,23 +52,22 @@
 
         "esri/layers/GraphicsLayer",
 
-        "esri/views/View3D",
+        "esri/views/MapView",
+        "esri/views/SceneView",
 
-        "esri/dijit/BasemapToggle",
-        
+        "esri/widgets/BasemapToggle",
+
         "dojo/domReady!",
       ], function(
         Map, SpatialReference, Camera, Collection, Graphic, Color,
         Extent, Polygon, Point,
         SimpleFillSymbol, SimpleLineSymbol,
         GraphicsLayer,
-        View3D,
+        MapView, SceneView,
         BasemapToggle
       ) {
-        
+
         map = new Map({
-          container: "mapDiv",
-          viewType: "2d",
           basemap: "national-geographic",
           extent: new Extent({
             xmin: -14900328,
@@ -78,15 +77,17 @@
             spatialReference: new SpatialReference(102100)
           })
         });
-        
+
         map.add(gl = new GraphicsLayer({
           hasZ: false
         }));
-        
-        overview = View3D({
+
+        overview = SceneView({
           container: "overviewDiv",
           map: map
         });
+        var node = overview.container.getElementsByClassName("esriUI")[0];
+        node.parentElement.removeChild(node);
 
         var camera = new Camera(
           new Point(-11143293, 4770595, 15770874.316803519, new SpatialReference(102100)), // position
@@ -97,7 +98,7 @@
         var updateExtentGraphic = function() {
           gl.clear();
           gl.add(new Graphic({
-            geometry: Polygon.fromExtent(map.view.get("extent")),
+            geometry: Polygon.fromExtent(view.extent),
             symbol: new SimpleFillSymbol({
               outline: new SimpleLineSymbol({
                 color: "white",
@@ -108,7 +109,7 @@
           }));
 
           gl.add(new Graphic({
-            geometry: Polygon.fromExtent(map.view.get("extent")),
+            geometry: Polygon.fromExtent(view.extent),
             symbol: new SimpleFillSymbol({
               outline: new SimpleLineSymbol({
                 color: "#E7298A",
@@ -119,25 +120,32 @@
           }));
         }
 
-        map.then(function() {
-          map.view.layerViewsFlat.on("change", function(e) {
+        view = new MapView({
+          map: map,
+          container: "mapDiv"
+        })
+
+        view.then(function() {
+
+          view.layerViewsFlat.on("change", function(e) {
             e.added.forEach(function(lv) {
               if (lv.layer === gl) {
                 lv.set("visible", false);
               }
             })
           });
-          map.view.on("view-change", function() {
-            camera.position.x = map.view.state.x;
-            camera.position.y = map.view.state.y;
+          view.watch("extent", function() {
+            camera.position.x = view.state.x;
+            camera.position.y = view.state.y;
             overview.set("camera", camera);
             updateExtentGraphic();
           });
-          map.view.set("animating", true);
+          view.set("animating", true);
           updateExtentGraphic();
+          overview.set("camera", camera);
         });
 
-        map.then(function() {
+        view.then(function() {
           overview.set("camera", camera);
         });
 
@@ -148,7 +156,7 @@
         toggle.startup();
 
       });
-      
+
     </script>
   </head>
 
@@ -184,5 +192,5 @@
       </svg>
     </div>
   </body>
-  
+
 </html>
